@@ -3,158 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Monde - Toutes les chaînes</title>
+    <title>IPTV Monde - Lecteur Intégré</title>
+    <!-- Chargement de la librairie pour lire l'IPTV (.m3u8) -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #0f172a; 
-            color: #f8fafc; 
-            padding: 20px; 
-            margin: 0;
-        }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; margin: 0; }
         h1 { text-align: center; color: #38bdf8; }
         
-        /* Barre de recherche */
-        .search-container { text-align: center; margin-bottom: 30px; margin-top: 20px; }
-        input[type="text"] { 
-            padding: 12px; 
-            width: 90%; 
-            max-width: 400px; 
-            border-radius: 8px; 
-            border: none; 
-            font-size: 16px; 
-            background: #1e293b;
-            color: white;
-            outline: 2px solid #334155;
-        }
-        input[type="text"]:focus { outline: 2px solid #38bdf8; }
-
-        /* Grille des pays */
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
-        .card { 
-            background: #1e293b; 
-            padding: 20px; 
-            border-radius: 10px; 
-            text-align: center; 
-            border: 1px solid #334155; 
-            transition: transform 0.2s; 
-        }
-        .card:hover { transform: translateY(-5px); }
-        .card h3 { margin-top: 0; font-size: 1.2rem; }
+        /* Layout principal */
+        .container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        @media (min-width: 768px) { .container { flex-direction: row; } }
         
-        /* Boutons et statuts */
-        .status-msg { color: #f59e0b; font-weight: bold; margin-top: 15px; }
-        .btn { 
-            display: inline-block; 
-            margin-top: 10px; 
-            padding: 10px 20px; 
-            background: #38bdf8; 
-            color: #0f172a; 
-            text-decoration: none; 
-            border-radius: 5px; 
-            font-weight: bold; 
-        }
-        .btn:hover { background: #0ea5e9; }
+        /* Zone lecteur vidéo */
+        .video-section { flex: 2; background: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; }
+        video { width: 100%; border-radius: 8px; background: #000; aspect-ratio: 16/9; }
+        
+        /* Zone liste des chaînes */
+        .list-section { flex: 1; background: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; max-height: 80vh; overflow-y: auto; }
+        
+        /* Liste des pays (Grille) */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 20px;}
+        .card { background: #334155; padding: 15px; border-radius: 8px; text-align: center; cursor: pointer; transition: 0.2s; }
+        .card:hover { background: #38bdf8; color: #0f172a; }
+        
+        /* Liste des chaînes */
+        .channel-item { padding: 10px; border-bottom: 1px solid #334155; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .channel-item:hover { background: #334155; }
+        .channel-name { font-weight: bold; }
+        .badge-maintenance { background: #ef4444; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; }
+        
+        .maintenance-global { color: #f59e0b; text-align: center; font-size: 1.5rem; padding: 50px; }
+        button { background: #38bdf8; color: #0f172a; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-bottom: 15px; font-weight: bold;}
     </style>
 </head>
 <body>
 
-    <h1>🌍 IPTV Monde - Toutes les chaînes</h1>
+    <h1>🌍 IPTV Monde - Lecteur Intégré</h1>
 
     <!-- ========================================== -->
-    <!-- ZONE DE CONFIGURATION DE LA MAINTENANCE    -->
+    <!-- CONFIGURATION DE LA MAINTENANCE           -->
     <!-- ========================================== -->
     <script>
-        // "ON" = Disponible | "OFF" = En maintenance
-        // Utilise le code officiel du pays (fr, us, es, it, jp, etc.)
-        const configMaintenance = {
-            "GLOBAL": "OFF", // ⚠️ Mets "OFF" ici pour fermer absolument TOUT le site
-            "fr": "ON",     // France
-            "es": "ON",     // Espagne
-            "it": "OFF",    // Italie (exemple de maintenance)
-            "us": "ON",     // Etats-Unis
-            "gb": "ON"      // Royaume-Uni
+        const config = {
+            "SITE_GLOBAL": "ON",       // "OFF" coupe tout le site
+            "LECTEUR_VIDEO": "ON",     // "OFF" bloque le lecteur vidéo (les listes s'affichent mais impossible de lire)
+            
+            // Maintenance par PAYS (Code officiel)
+            "pays": {
+                "it": "OFF", // Coupe toute l'Italie
+                "ru": "OFF"
+            },
+            
+            // Maintenance par CHAÎNE SPECIFIQUE (ID iptv-org)
+            "chaines": {
+                "TF1.fr": "ON",
+                "France2.fr": "ON",
+                "BFMTV.fr": "OFF" // Par exemple, bloque uniquement BFM TV
+            }
         };
     </script>
     <!-- ========================================== -->
 
-    <!-- Barre de recherche -->
-    <div class="search-container">
-        <input type="text" id="searchInput" placeholder="🔍 Rechercher un pays (ex: France, Japan...)" onkeyup="filtrerPays()">
+    <!-- Vues de l'application -->
+    <div id="vue-pays">
+        <h2 style="text-align:center;">Choisissez un pays</h2>
+        <div id="grille-pays" class="grid">Chargement...</div>
     </div>
 
-    <!-- Conteneur principal -->
-    <div id="app" class="grid">Chargement des pays du monde entier...</div>
+    <div id="vue-lecteur" class="container" style="display: none;">
+        <!-- Lecteur Vidéo -->
+        <div class="video-section">
+            <button onclick="retourAuxPays()">⬅ Retour aux pays</button>
+            <h2 id="titre-chaine">Sélectionnez une chaîne</h2>
+            <div id="zone-video">
+                <video id="lecteur" controls></video>
+            </div>
+            <p style="margin-top: 15px; font-size: 0.9em; color: #94a3b8;">
+                Info : Si la vidéo ne charge pas, le flux source est peut-être hors ligne ou bloqué (CORS).
+            </p>
+        </div>
+
+        <!-- Liste des chaînes du pays sélectionné -->
+        <div class="list-section">
+            <h3 id="titre-liste-chaines">Chaînes</h3>
+            <div id="liste-chaines"></div>
+        </div>
+    </div>
 
     <script>
-        let tousLesPays = []; // Va stocker la liste de tous les pays
+        const vuePays = document.getElementById('vue-pays');
+        const vueLecteur = document.getElementById('vue-lecteur');
+        const lecteurVideo = document.getElementById('lecteur');
+        const zoneVideo = document.getElementById('zone-video');
+        let hlsPlayer = null; // Instance du lecteur HLS
 
-        // 1. Fonction pour récupérer tous les pays depuis l'API
-        async function chargerPays() {
-            const app = document.getElementById('app');
+        // 1. Initialisation
+        async function init() {
+            if (config["SITE_GLOBAL"] === "OFF") {
+                document.body.innerHTML = "<div class='maintenance-global'>🚧 Le site est en maintenance totale. 🚧</div>";
+                return;
+            }
+
+            if (config["LECTEUR_VIDEO"] === "OFF") {
+                zoneVideo.innerHTML = "<div style='text-align:center; padding: 50px; background:#334155; border-radius:8px; color:#f59e0b;'>🚧 Le lecteur vidéo est actuellement en maintenance. 🚧</div>";
+            }
+
+            // Charger les pays
             try {
-                // On récupère la liste complète des pays depuis iptv-org
-                const reponse = await fetch('https://iptv-org.github.io/api/countries.json');
-                tousLesPays = await reponse.json();
-
-                // On affiche les pays à l'écran
-                afficherPays(tousLesPays);
+                const response = await fetch('https://iptv-org.github.io/api/countries.json');
+                const pays = await response.json();
+                afficherPays(pays);
             } catch (e) {
-                app.innerHTML = "<h3 style='color:red;'>Erreur : Impossible de charger la base de données de l'API.</h3>";
+                document.getElementById('grille-pays').innerHTML = "Erreur réseau.";
             }
         }
 
-        // 2. Fonction pour créer les "cartes" à l'écran
+        // 2. Afficher la grille des pays
         function afficherPays(listePays) {
-            const app = document.getElementById('app');
-            app.innerHTML = ""; // On vide le message de chargement
+            const grille = document.getElementById('grille-pays');
+            grille.innerHTML = "";
 
-            // Vérification de la maintenance GLOBALE
-            if (configMaintenance["GLOBAL"] === "OFF") {
-                app.innerHTML = "<h2 style='color:#f59e0b; text-align:center; width:100%;'>🚧 Le site complet est actuellement en maintenance. Revenez plus tard ! 🚧</h2>";
-                return; // On arrête le code ici
-            }
-
-            // On génère une carte pour chaque pays
             listePays.forEach(pays => {
-                if (!pays.name) return; // Sécurité : on ignore s'il n'y a pas de nom
-
+                if (!pays.name) return;
                 const code = pays.code.toLowerCase();
-                const drapeau = pays.flag || "📺"; // Si pas de drapeau, on met une télé
+                
+                // On saute les pays en maintenance complète
+                if (config.pays[code] === "OFF") return;
+
                 const card = document.createElement('div');
                 card.className = 'card';
-
-                // Le lien officiel vers la liste m3u du pays
-                const urlPlaylist = `https://iptv-org.github.io/iptv/countries/${code}.m3u`;
-
-                // Vérification de la maintenance par pays
-                if (configMaintenance[code] === "OFF") {
-                    card.innerHTML = `
-                        <h3>${pays.name} ${drapeau}</h3>
-                        <p class="status-msg">⚠️ En maintenance</p>
-                    `;
-                } else {
-                    card.innerHTML = `
-                        <h3>${pays.name} ${drapeau}</h3>
-                        <a href="${urlPlaylist}" class="btn">Obtenir les chaînes</a>
-                    `;
-                }
-                app.appendChild(card);
+                card.innerHTML = `${pays.name} ${pays.flag || ''}`;
+                card.onclick = () => chargerChainesPays(code, pays.name);
+                grille.appendChild(card);
             });
         }
 
-        // 3. Fonction pour la barre de recherche
-        function filtrerPays() {
-            const recherche = document.getElementById('searchInput').value.toLowerCase();
-            // On filtre la liste pour ne garder que ceux qui correspondent à la recherche
-            const paysFiltres = tousLesPays.filter(pays => 
-                pays.name.toLowerCase().includes(recherche)
-            );
-            afficherPays(paysFiltres); // On réaffiche avec les résultats filtrés
+        // 3. Charger les chaînes quand on clique sur un pays
+        async function chargerChainesPays(codePays, nomPays) {
+            vuePays.style.display = "none";
+            vueLecteur.style.display = "flex";
+            document.getElementById('titre-liste-chaines').innerText = `Chaînes - ${nomPays}`;
+            const conteneurListe = document.getElementById('liste-chaines');
+            conteneurListe.innerHTML = "Chargement des chaînes...";
+
+            try {
+                // On utilise l'API channel par pays
+                const response = await fetch(`https://iptv-org.github.io/api/channels/${codePays}.json`);
+                const chaines = await response.json();
+                afficherChaines(chaines);
+            } catch (e) {
+                conteneurListe.innerHTML = "Erreur ou aucune chaîne trouvée.";
+            }
         }
 
-        // Lancement de l'application au démarrage
-        chargerPays();
+        // 4. Afficher la liste des chaînes
+        function afficherChaines(chaines) {
+            const conteneurListe = document.getElementById('liste-chaines');
+            conteneurListe.innerHTML = "";
+
+            chaines.forEach(chaine => {
+                const item = document.createElement('div');
+                item.className = 'channel-item';
+                
+                // Vérifier si cette chaîne spécifique est en maintenance
+                if (config.chaines[chaine.id] === "OFF") {
+                    item.innerHTML = `<span class="channel-name" style="color:#64748b">${chaine.name}</span> <span class="badge-maintenance">Maintenance</span>`;
+                    item.style.cursor = "not-allowed";
+                } else {
+                    item.innerHTML = `<span class="channel-name">${chaine.name}</span>`;
+                    // On lance la vidéo au clic (si le lecteur n'est pas en maintenance)
+                    item.onclick = () => {
+                        if (config["LECTEUR_VIDEO"] === "ON") {
+                            lireVideo(chaine.url, chaine.name);
+                        } else {
+                            alert("Le lecteur vidéo est en maintenance.");
+                        }
+                    };
+                }
+                conteneurListe.appendChild(item);
+            });
+        }
+
+        // 5. Lire le flux IPTV (m3u8)
+        function lireVideo(urlFlux, nomChaine) {
+            document.getElementById('titre-chaine').innerText = `En direct : ${nomChaine}`;
+            
+            // Si le flux est un m3u8 et que le navigateur supporte HLS.js
+            if (Hls.isSupported() && urlFlux.includes('.m3u8')) {
+                if (hlsPlayer) { hlsPlayer.destroy(); } // Nettoyer l'ancienne vidéo
+                hlsPlayer = new Hls();
+                hlsPlayer.loadSource(urlFlux);
+                hlsPlayer.attachMedia(lecteurVideo);
+                hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
+                    lecteurVideo.play();
+                });
+            } 
+            // Pour Safari (qui lit le HLS nativement) ou les flux mp4 directs
+            else if (lecteurVideo.canPlayType('application/vnd.apple.mpegurl') || !urlFlux.includes('.m3u8')) {
+                lecteurVideo.src = urlFlux;
+                lecteurVideo.play();
+            }
+        }
+
+        // 6. Navigation
+        function retourAuxPays() {
+            if (hlsPlayer) { hlsPlayer.destroy(); } // Couper la vidéo
+            lecteurVideo.pause();
+            lecteurVideo.removeAttribute('src');
+            lecteurVideo.load();
+            
+            vueLecteur.style.display = "none";
+            vuePays.style.display = "block";
+            document.getElementById('titre-chaine').innerText = "Sélectionnez une chaîne";
+        }
+
+        // Démarrage
+        init();
     </script>
 </body>
 </html>
