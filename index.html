@@ -2,64 +2,77 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Portail IPTV Complet</title>
+    <title>Mon Portail IPTV</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: white; padding: 20px; }
+        body { font-family: sans-serif; background: #0f172a; color: white; margin: 0; padding: 20px; }
+        /* Style des écrans de maintenance */
+        .maintenance-screen { display: none; text-align: center; padding-top: 50px; }
+        .maintenance-screen img { max-width: 600px; width: 100%; }
+        
+        /* Grille et Lecteur */
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
-        .card { background: #1e293b; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #334155; }
-        .btn { display: block; margin-top: 10px; padding: 8px; background: #38bdf8; color: black; text-decoration: none; border-radius: 4px; font-weight: bold; }
-        .maint { color: #f59e0b; font-weight: bold; }
-        #lecteur-zone { margin-top: 20px; background: #000; padding: 20px; border-radius: 10px; }
+        #vue-lecteur { display: none; }
+        video { width: 100%; background: black; border-radius: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>🌍 Portail IPTV Mondial</h1>
+    <div id="maintenance-global" class="maintenance-screen"><img src="images/maintenance_site.png"></div>
+    <div id="maintenance-lecteur" class="maintenance-screen"><img src="images/maintenance_lecteur.png"></div>
+    <div id="maintenance-chaine" class="maintenance-screen"><img src="images/maintenance_chaine.png"></div>
 
-    <script>
-        const config = {
-            "france": "ON",
-            "espagne": "ON",
-            "italie": "ON"
-        };
-    </script>
+    <div id="app-content">
+        <h1>🌍 Catalogue IPTV</h1>
+        <div id="app" class="grid"></div>
+    </div>
 
-    <div id="app" class="grid"></div>
-
-    <div id="lecteur-zone" style="display:none;">
-        <button onclick="document.getElementById('lecteur-zone').style.display='none'">Fermer Lecteur</button>
-        <video id="video" controls style="width:100%;"></video>
+    <div id="vue-lecteur">
+        <button onclick="location.reload()">⬅ Retour</button>
+        <video id="video" controls></video>
     </div>
 
     <script>
-        const app = document.getElementById('app');
-        const video = document.getElementById('video');
-        let hls;
+        // CONFIGURATION
+        const config = {
+            "GLOBAL": "OFF",
+            "LECTEUR": "OFF"
+        };
 
-        const paysList = [
-            { id: "france", name: "France", code: "fr" },
-            { id: "espagne", name: "Espagne", code: "es" },
-            { id: "italie", name: "Italie", code: "it" }
-        ];
+        const paysList = [{name: "France", code: "fr"}, {name: "Espagne", code: "es"}];
 
         function init() {
+            if (config.GLOBAL === "OFF") {
+                document.getElementById('maintenance-global').style.display = 'block';
+                document.getElementById('app-content').style.display = 'none';
+                return;
+            }
+
+            const app = document.getElementById('app');
             paysList.forEach(p => {
                 const card = document.createElement('div');
-                card.className = 'card';
-                if (config[p.id] === "OFF") {
-                    card.innerHTML = `<h3>${p.name}</h3><p class="maint">⚠️ En maintenance</p>`;
-                } else {
-                    card.innerHTML = `<h3>${p.name}</h3><a href="#" class="btn" onclick="lancer('${p.code}')">Accéder</a>`;
-                }
+                card.innerHTML = `<h3>${p.name}</h3><button onclick="chargerPays('${p.code}')">Ouvrir</button>`;
                 app.appendChild(card);
             });
         }
 
-        function lancer(code) {
-            alert("Liste chargée pour : " + code + ". Note : Les flux HTTPS bloqués par les sites ne fonctionneront pas directement dans le navigateur.");
-            document.getElementById('lecteur-zone').style.display = 'block';
-            // Ici tu peux ajouter la logique de parsing .m3u
+        async function chargerPays(code) {
+            if (config.LECTEUR === "OFF") {
+                document.getElementById('app-content').style.display = 'none';
+                document.getElementById('maintenance-lecteur').style.display = 'block';
+                return;
+            }
+
+            // Afficher le lecteur
+            document.getElementById('app-content').style.display = 'none';
+            document.getElementById('vue-lecteur').style.display = 'block';
+
+            // IMPORTANT : Utilisation du fichier M3U officiel
+            const url = `https://iptv-org.github.io/iptv/countries/${code}.m3u`;
+            alert("Chargement de la playlist : " + url);
+            
+            // Note: Pour lire réellement la vidéo, il faudra parser le fichier .m3u
+            // et utiliser un proxy si le lien est en HTTP.
         }
 
         init();
